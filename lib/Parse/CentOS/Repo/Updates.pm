@@ -8,7 +8,9 @@ use Moo;
 use MooX::Types::MooseLike::Base qw( HashRef Str );
 
 use Carp;
+use File::Basename;
 use HTTP::Tiny;
+use IO::Uncompress::Bunzip2 qw( bunzip2 $Bunzip2Error );
 use Path::Tiny;
 use XML::SAX;
 
@@ -118,6 +120,10 @@ sub update {
 
         $file->spew_raw( $res->{content} );
         utime $epoch, $epoch, $file->canonpath if $epoch;
+
+        my $db = basename( $file, ".bz2" );
+        bunzip2 $file->canonpath, $file->parent->child($db)->canonpath
+            or warn("bunzip2 failed: $Bunzip2Error\n"), next;
     }
 }
 
