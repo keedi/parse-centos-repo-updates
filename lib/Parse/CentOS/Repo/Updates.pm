@@ -8,6 +8,7 @@ use Moo;
 use MooX::Types::MooseLike::Base qw( HashRef Str );
 
 use Carp;
+use DBIx::Lite;
 use File::Basename;
 use HTTP::Tiny;
 use IO::Uncompress::Bunzip2 qw( bunzip2 $Bunzip2Error );
@@ -15,6 +16,35 @@ use Path::Tiny;
 use XML::SAX;
 
 use Parse::CentOS::Repo::Updates::XMLHandler;
+
+my @PRIMARY_PACKAGES_COLUMNS = qw(
+    pkgKey
+    pkgId
+    name
+    arch
+    version
+    epoch
+    release
+    summary
+    description
+    url
+    time_file
+    time_build
+    rpm_license
+    rpm_vendor
+    rpm_group
+    rpm_buildhost
+    rpm_sourcerpm
+    rpm_header_start
+    rpm_header_end
+    rpm_packager
+    size_package
+    size_installed
+    size_archive
+    location_href
+    location_base
+    checksum_type
+);
 
 has major => (
     is  => 'ro',
@@ -146,6 +176,31 @@ sub is_recent {
     }
 
     return 1;
+}
+
+sub get_updates {
+    my $self = shift;
+
+    #
+    # SELECT * FROM packages
+    #
+    my $result = do {
+        my $db   = path($self->cache_dir)->child('primary.sqlite');
+        my $dbix = DBIx::Lite->connect("dbi:SQLite:$db")
+            or croak "cannot connect to $db\n";
+        $dbix->schema->table('packages')->autopk('pkgKey');
+        $dbix->schema->table('packages')->resultset_class('Parse::CentOS::Repo::Updates::ResultSet');
+
+        my $rs
+            = $dbix->table('packages')
+            ->select(@PRIMARY_PACKAGES_COLUMNS)
+            ->order_by('pkgKey')
+            ;
+
+        $rs;
+    };
+
+    return $result;
 }
 
 1;
