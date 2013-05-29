@@ -203,6 +203,57 @@ sub get_updates {
     return $result;
 }
 
+sub get_security_updates {
+    my $self = shift;
+
+    #
+    # SELECT pkgKey
+    # FROM changelog
+    # WHERE
+    #        changelog LIKE '%CVE%'
+    #     OR changelog like '%security%'
+    # GROUP BY pkgKey;
+    #
+    my @pkg_keys = do {
+        my $db   = path($self->cache_dir)->child('other.sqlite');
+        my $dbix = DBIx::Lite->connect("dbi:SQLite:$db")
+            or croak "cannot connect to $db\n";
+
+        my $rs
+            = $dbix->table('changelog')
+            ->select('pkgKey')
+            ->search( { changelog => { -like => [ '%security%', '%CVE%' ] } }, )
+            ->group_by('pkgKey')
+            ;
+
+        $rs->get_column('pkgKey');
+    };
+
+    #
+    # SELECT *
+    # FROM packages
+    # WHERE pkgKey = ?;
+    #
+    my $result = do {
+        my $db   = path($self->cache_dir)->child('primary.sqlite');
+        my $dbix = DBIx::Lite->connect("dbi:SQLite:$db")
+            or croak "cannot connect to $db\n";
+        $dbix->schema->table('packages')->autopk('pkgKey');
+        $dbix->schema->table('packages')->resultset_class('Parse::CentOS::Repo::Updates::ResultSet');
+
+        my $rs
+            = $dbix->table('packages')
+            ->select(@PRIMARY_PACKAGES_COLUMNS)
+            ->search( { pkgKey => \@pkg_keys }, )
+            ->order_by('pkgKey')
+            ;
+
+        $rs;
+    };
+
+    return $result;
+}
+
 1;
 __END__
 
