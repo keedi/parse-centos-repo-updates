@@ -119,7 +119,7 @@ sub update {
         croak "cannot get $url\n" unless $res->{success};
 
         $file->spew_raw( $res->{content} );
-        utime $epoch, $epoch, $file->canonpath if $epoch;
+        $file->touch($epoch) if $epoch;
 
         my $db = basename( $file, ".bz2" );
         bunzip2 $file->canonpath, $file->parent->child($db)->canonpath
